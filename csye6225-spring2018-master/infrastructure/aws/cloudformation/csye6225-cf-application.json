@@ -1,0 +1,571 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Ec2 block device mapping",
+    "Resources": {
+    "asglaunchconfig" : {
+        "Type" : "AWS::AutoScaling::LaunchConfiguration",
+        "Properties" : {
+          "KeyName" : { "Ref" : "Keyname" },
+          "ImageId" : { "Ref" : "IMAGEID"},
+        "SecurityGroups": [
+            {
+                "Ref": "EC2SecurityGroup"
+            }
+        ],
+          "InstanceType" : { "Ref" : "INSTANCETYPE" },
+          "AssociatePublicIpAddress":true,
+          "IamInstanceProfile": "codedeployec2profile",
+          "BlockDeviceMappings": [
+              {
+                  "DeviceName": "/dev/sdm",
+                  "Ebs": {
+                      "VolumeType": {
+                          "Ref": "VOLUMETYPE"
+                      },
+                      "VolumeSize": {
+                          "Ref": "VOLUMESIZE"
+                      }
+                  }
+              }
+          ],
+          "UserData"       : {"Fn::Base64": {
+            "Fn::Join": [
+                "",
+                [
+                    "#!/bin/bash -xe \n",
+                    "sudo apt-get update \n",
+                    "sudo apt-get install openjdk-8-jdk -y\n",
+                    "sudo apt-get install ruby -y \n",
+                    "sudo apt-get install wget -y \n",
+                    "sudo apt-get install python -y \n",
+                    "sudo apt-get update \n",
+                    "sudo wget https://aws-codedeploy-us-east-1.s3.amazonaws.com/latest/install \n",
+                    "sudo chmod +x ./install \n",
+                    "sudo ./install auto \n",
+                    "sudo apt-get install tomcat8 -y \n",
+                    "sudo echo \"JAVA_OPTS=\\\"\\${JAVA_OPTS} -Dspring.datasource.url=jdbc:mysql://", {"Fn::GetAtt": ["RDS","Endpoint.Address"]}, ":3306/", {"Ref" : "DBNAME"}, "\\\"\" >> /etc/default/tomcat8 \n",
+                    "sudo echo \"JAVA_OPTS=\\\"\\${JAVA_OPTS} -Dspring.datasource.username=", {"Ref" : "USERNAME"}, "\\\"\" >> /etc/default/tomcat8 \n",
+                    "sudo echo \"JAVA_OPTS=\\\"\\${JAVA_OPTS} -Dspring.datasource.password=", {"Ref" : "PASSWORD"}, "\\\"\" >> /etc/default/tomcat8 \n", 
+                    "sudo echo \"JAVA_OPTS=\\\"\\${JAVA_OPTS} -Dspring.profiles.active=aws\\\"\" >> /etc/default/tomcat8 \n",
+                    "sudo echo \"JAVA_OPTS=\\\"\\${JAVA_OPTS} -DbucketName=",{"Ref" : "S3BUCKETNAME" }, "\\\"\" >> /etc/default/tomcat8 \n",
+                    "sudo service tomcat8 restart \n",
+                    "cd /home/ubuntu/ \n",
+		            "sudo mkdir images/ \n",
+                    "chmod 777 /home/ubuntu/images \n",
+                    "sudo apt-get update \n",
+                    "sudo touch /tmp/awslogs.conf \n", 
+                    "sudo echo '[general]' > /tmp/awslogs.conf \n",  
+                    "sudo echo 'state_file= /var/awslogs/agent-state' >> /tmp/awslogs.conf \n",
+                    "sudo echo '[logstream1]' >> /tmp/awslogs.conf \n",
+                    "sudo echo 'file = /var/log/tomcat8/csye6225-aws.log' >> /tmp/awslogs.conf \n",
+                    "sudo echo 'log_group_name = csye6225-webapp' >> /tmp/awslogs.conf \n",
+                    "sudo echo 'log_stream_name = csye6225-webapp' >> /tmp/awslogs.conf \n",
+                    "sudo echo 'datetime_format = %d/%b/%Y:%H:%M:%S' >> /tmp/awslogs.conf \n",
+                    "curl https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py -O \n",
+                    {
+                    "Fn::Join": [
+                        " ",
+                        [
+                        "sudo python ./awslogs-agent-setup.py -n -r",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "-c /tmp/awslogs.conf || error_exit 'Failed to run CloudWatch Logs agent setup' \n"
+                        ]
+                    ]
+                    },
+                    "cd /etc/systemd/system \n",
+                    "sudo touch awslogs.service \n",
+                    "sudo echo '[Unit]' >> awslogs.service \n",
+                    "sudo echo 'Description=Service for CloudWatch Logs agent' >> awslogs.service \n",
+                    "sudo echo 'After=rc-local.service' >> awslogs.service \n",
+                    "sudo echo '[Service]' >> awslogs.service \n",
+                    "sudo echo 'Type=simple' >> awslogs.service \n",
+                    "sudo echo 'Restart=always' >> awslogs.service \n",
+                    "sudo echo 'KillMode=process' >> awslogs.service \n",
+                    "sudo echo 'TimeoutSec=infinity' >> awslogs.service \n",
+                    "sudo echo 'PIDFile=/var/awslogs/state/awslogs.pid' >> awslogs.service \n",
+                    "sudo echo 'ExecStart=/var/awslogs/bin/awslogs-agent-launcher.sh --start --background --pidfile $PIDFILE --user awslogs --chuid awslogs &amp;' >> awslogs.service \n",
+                    "sudo echo '[Install]' >> awslogs.service \n",
+                    "sudo echo 'WantedBy=multi-user.target' >> awslogs.service \n",
+                    "sudo systemctl start awslogs.service \n",
+                    "sudo systemctl enable awslogs.service \n",
+                    "sudo service codedeploy-agent start \n",
+                    "sudo apt-get update"
+                ]
+            ]
+        }}
+        },
+        "DependsOn": "RDS"
+      },
+      "WebServerGroup" : {
+        "Type" : "AWS::AutoScaling::AutoScalingGroup",
+        "Properties" : {
+          "VPCZoneIdentifier" : [{"Fn::ImportValue" : "WebSubnet1IDExportValue"},
+          {"Fn::ImportValue" : "WebSubnet2IDExportValue"} ] ,
+          "LaunchConfigurationName" : { "Ref" : "asglaunchconfig" },
+          "Tags" : [ {
+            "Key": "Name",
+                        "Value": {
+                            "Ref": "EC2NAME"
+                        },
+            "PropagateAtLaunch" : "true"
+         }],
+          "MinSize" : "3",
+          "MaxSize" : "7",
+          "Cooldown" : "60",
+          "DesiredCapacity" : "3",
+          "TargetGroupARNs" : [ { "Ref" : "ALBTargetGroup" } ]
+        }},
+        "DynamoDBTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "AttributeDefinitions": [
+                    {
+                        "AttributeName": {
+                            "Ref": "PRIMARYKEY"
+                        },
+                        "AttributeType": "S"
+                    },
+                    {
+                        "AttributeName": "expirationtime",
+                        "AttributeType": "N"
+                    }
+                ],
+                "KeySchema": [
+                    {
+                        "AttributeName": {
+                            "Ref": "PRIMARYKEY"
+                        },
+                        "KeyType": "HASH"
+                    },
+                    {
+                        "AttributeName": "expirationtime",
+                        "KeyType": "RANGE"
+                    }
+                ],
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": "5",
+                    "WriteCapacityUnits": "5"
+                },
+                "TableName": {
+                    "Ref": "TABLENAME"
+                },
+                "TimeToLiveSpecification": {
+                    "AttributeName": "expirationtime",
+                    "Enabled": "true"
+                }
+                }
+            },
+       
+        "RDS": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "AllocatedStorage": {
+                    "Ref": "ALLOCATEDSTORAGE"
+                },
+                "DBName": {
+                    "Ref": "DBNAME"
+                },
+                "Engine": {
+                    "Ref": "ENGINE"
+                },
+                "EngineVersion": {
+                    "Ref": "ENGINEVERSION"
+                },
+                "DBInstanceClass": {
+                    "Ref": "DBInstanceClass"
+                },
+                "DBInstanceIdentifier": {
+                    "Ref": "DBInstanceIdentifier"
+                },
+                "MultiAZ": "false",
+                "MasterUsername": {
+                    "Ref": "USERNAME"
+                },
+                "MasterUserPassword": {
+                    "Ref": "PASSWORD"
+                },
+                "PubliclyAccessible": "false",
+                "DBSubnetGroupName": {
+                    "Ref": "DBSubnetGroup"
+                },
+                "VPCSecurityGroups": [
+                    {
+                        "Ref": "GroupIdRDS"
+                    }
+                ]
+            }
+        },
+        "DBSubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupDescription": "Subnets available for the RDS DB Instance",
+                "SubnetIds": [
+                    {
+                        "Fn::ImportValue" : "DBSubnet1IDExportValue"
+                    },
+                    {
+                        "Fn::ImportValue" : "DBSubnet2IDExportValue"
+                    }
+                ]
+            }
+        },
+        "WebServerScaleUpPolicy": {
+          "Type": "AWS::AutoScaling::ScalingPolicy",
+          "Properties": {
+            "AdjustmentType": "ChangeInCapacity",
+            "AutoScalingGroupName": {
+              "Ref": "WebServerGroup"
+            },
+            "Cooldown": "60",
+            "ScalingAdjustment": "1"
+          }
+        },
+        "WebServerScaleDownPolicy": {
+          "Type": "AWS::AutoScaling::ScalingPolicy",
+          "Properties": {
+            "AdjustmentType": "ChangeInCapacity",
+            "AutoScalingGroupName": {
+              "Ref": "WebServerGroup"
+            },
+            "Cooldown": "60",
+            "ScalingAdjustment": "-1"
+          }
+        },
+        "CPUAlarmHigh": {
+          "Type": "AWS::CloudWatch::Alarm",
+          "Properties": {
+            "AlarmDescription": "Scale-up if CPU > 10% for 10 minutes",
+            "MetricName": "CPUUtilization",
+            "Namespace": "AWS/EC2",
+            "Statistic": "Average",
+            "Period": "300",
+            "EvaluationPeriods": "2",
+            "Threshold": "10",
+            "AlarmActions": [
+              {
+                "Ref": "WebServerScaleUpPolicy"
+              }
+            ],
+            "Dimensions": [
+              {
+                "Name": "AutoScalingGroupName",
+                "Value": {
+                  "Ref": "WebServerGroup"
+                }
+              }
+            ],
+            "ComparisonOperator": "GreaterThanThreshold"
+          }
+        },
+        "CPUAlarmLow": {
+          "Type": "AWS::CloudWatch::Alarm",
+          "Properties": {
+            "AlarmDescription": "Scale-down if CPU < 5% for 10 minutes",
+            "MetricName": "CPUUtilization",
+            "Namespace": "AWS/EC2",
+            "Statistic": "Average",
+            "Period": "300",
+            "EvaluationPeriods": "2",
+            "Threshold": "8",
+            "AlarmActions": [
+              {
+                "Ref": "WebServerScaleDownPolicy"
+              }
+            ],
+            "Dimensions": [
+              {
+                "Name": "AutoScalingGroupName",
+                "Value": {
+                  "Ref": "WebServerGroup"
+                }
+              }
+            ],
+            "ComparisonOperator": "LessThanThreshold"
+          }
+        },
+        "LoadBalancerSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+              "GroupDescription": "Load Balancer Security Group",
+              "GroupName":"LoadBalancerGroupSecurity",
+              "VpcId": {
+                "Ref": "VpcId"
+              },
+              "SecurityGroupIngress": [{
+                "IpProtocol": "tcp",
+                "FromPort": "443",
+                "ToPort": "443",
+                "CidrIp": "0.0.0.0/0"
+              }],
+              "SecurityGroupEgress": [{
+                "IpProtocol": "tcp",
+                "FromPort": "8080",
+                "ToPort": "8080",
+                "DestinationSecurityGroupId": {
+                  "Ref": "EC2SecurityGroup"
+                }
+              }]
+            }
+          },
+        "LoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "Name": "csye6225LoadBalancer",
+                "Scheme": "internet-facing",
+                "IpAddressType": "ipv4",
+                "Subnets": [
+                      {"Fn::ImportValue" : "WebSubnet1IDExportValue"},
+                      {"Fn::ImportValue" : "WebSubnet2IDExportValue"}                    
+                ],
+                "Type": "application",
+                "SecurityGroups": [
+                    {
+                        "Fn::GetAtt": [
+                            "LoadBalancerSecurityGroup",
+                            "GroupId"
+                          ]
+                    }
+                ]
+
+            }
+        },
+        "Listener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+              "DefaultActions": [{
+                "Type": "forward",
+                "TargetGroupArn": { "Ref": "ALBTargetGroup" }
+              }],
+              "LoadBalancerArn": { "Ref": "LoadBalancer" },
+              "Port": "443",
+              "Protocol": "HTTPS",
+              "Certificates": [{
+                "CertificateArn": { "Ref": "CertificateArn" }
+              }]
+            }
+          },
+          "ALBTargetGroup" : {
+            "Type" : "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties" : {
+              "Name" : { "Ref": "TargetGroupName" },
+              "Port" : "8080",
+              "HealthCheckPort": "8080",
+              "Matcher":{
+                "HttpCode" : "401,200"
+              },
+              "HealthCheckIntervalSeconds": 30,
+              "HealthCheckTimeoutSeconds": 10,
+              "HealthyThresholdCount": 4,
+              "Protocol" : "HTTP",
+              "VpcId": {
+                "Ref": "VpcId"
+              },
+              "TargetGroupAttributes" : [
+                  {
+                      "Value":"true",
+                      "Key":"stickiness.enabled"
+                  },
+                  {
+                    "Value":"600",
+                    "Key":"deregistration_delay.timeout_seconds"
+                  },
+                  {
+                    "Value":"lb_cookie",
+                    "Key":"stickiness.type"
+                  },
+                  {
+                    "Value":"600",
+                    "Key":"stickiness.lb_cookie.duration_seconds"
+                  }
+              ],
+              "Tags":[{
+                  "Key":"Name",
+                  "Value":"EC2NAME"
+              }]
+            }
+          },
+          "Route53RecordSetA": {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+              "AliasTarget": {
+                "DNSName": {
+                  "Fn::GetAtt": [
+                    "LoadBalancer",
+                    "DNSName"
+                  ]
+                },
+                "EvaluateTargetHealth": "true",
+                "HostedZoneId": {
+                  "Fn::GetAtt": [
+                    "LoadBalancer",
+                    "CanonicalHostedZoneID"
+                  ]
+                }
+              },
+              "HostedZoneName": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Ref": "DNS"
+                    },
+                    "."
+                  ]
+                ]
+              },
+              "Comment": "DNS name for my instance.",
+              "Name": {
+                "Fn::Join": [
+                  "",
+                  [
+                    {
+                      "Ref": "DNS"
+                    },
+                    "."
+                  ]
+                ]
+              },
+              "Type": "A"
+            }
+          },
+          "CodeDeployApplication": {
+            "Type": "AWS::CodeDeploy::Application",
+            "Properties": {
+            "ApplicationName" : "CodeDeployApp",
+              "ComputePlatform": "Server"
+            }
+          },
+
+          
+          "DeploymentGroup" : {
+            "Type" : "AWS::CodeDeploy::DeploymentGroup",
+            "Properties" : {
+              "ApplicationName" : {"Ref" : "CodeDeployApplication"},
+              "DeploymentGroupName":"CodeDeployGroup",
+              "AutoScalingGroups" : [ { "Ref": "WebServerGroup" } ],
+              "Ec2TagFilters" : [{
+                "Key" : "Name",
+                "Value" : "EC2NAME",
+                "Type" : "KEY_AND_VALUE"
+              }],
+              "DeploymentStyle" : {"DeploymentType": "IN_PLACE","DeploymentOption":"WITHOUT_TRAFFIC_CONTROL"},
+              "ServiceRoleArn" : {
+                "Ref" : "CodeDeployServiceRoleArn"
+            }
+            }
+          }
+        },           
+    "Parameters": {
+        "CodeDeployServiceRoleArn" : {
+            "Description": "Code Deploy service role arn",
+            "Type": "String"
+        },
+        "DNS" : {
+            "Description": "Domain name of the web site",
+            "Type": "String"
+        },
+        "TargetGroupName": {
+            "Description": "Target group name",
+            "Type": "String"
+        },
+        "IMAGEID": {
+            "Description": "Image Id",
+            "Type": "String"
+        },
+        "INSTANCETYPE": {
+            "Description": "Instance type",
+            "Type": "String"
+        },
+        "VOLUMETYPE": {
+            "Description": "Volume type",
+            "Type": "String"
+        },
+        "VOLUMESIZE": {
+            "Description": "Volume size",
+            "Type": "String"
+        },
+        "PRIMARYKEY": {
+            "Description": "Primary Key Name",
+            "Type": "String"
+        },
+        "TABLENAME": {
+            "Description": "Table name",
+            "Type": "String"
+        },
+        "S3BUCKETNAME": {
+            "Description": "S3 Bucket Name",
+            "Type": "String"
+        },
+        "ALLOCATEDSTORAGE": {
+            "Description": "Allocated storage for DB",
+            "Type": "String"
+        },
+        "DBNAME": {
+            "Description": "DB name",
+            "Type": "String"
+        },
+        "ENGINE": {
+            "Description": "DB engine",
+            "Type": "String"
+        },
+        "ENGINEVERSION": {
+            "Description": "DB engine version",
+            "Type": "String"
+        },
+        "DBInstanceClass": {
+            "Description": "DB class",
+            "Type": "String"
+        },
+        "DBInstanceIdentifier": {
+            "Description": "DB instance identifier",
+            "Type": "String"
+        },
+        "USERNAME": {
+            "Description": "username",
+            "Type": "String"
+        },
+        "PASSWORD": {
+            "Description": "password",
+            "Type": "String"
+        },
+        "SubnetId": {
+            "Description": "subnet id for RDS",
+            "Type": "String"
+        },
+        "SubnetId2": {
+            "Description": "subnet id for RDS",
+            "Type": "String"
+        },
+        "SubnetId3": {
+            "Description": "subnet id for RDS",
+            "Type": "String"
+        },
+        "GroupIdRDS": {
+            "Description": "group id for RDS",
+            "Type": "String"
+        },
+        "EC2SecurityGroup": {
+            "Description": "group id for RDS",
+            "Type": "String"
+        },
+        "Keyname": {
+            "Description": "Name of the key-pair file for connecting to EC2 Instance",
+            "Type": "String"
+        },
+        "EC2NAME": {
+            "Description": "Name of the EC2 Instance",
+            "Type": "String"
+        },
+        "VpcId": {
+            "Description": "VPC ID instance",
+            "Type": "String"
+        },
+        "CertificateArn": {
+            "Description": "VPC ID instance",
+            "Type": "String"
+        }
+    }
+}
+

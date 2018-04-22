@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <title>About Me!</title>
+    <div th:replace="fragments/header :: header"/>
+</head>
+<body>
+<div th:replace="fragments/navigation :: navigation"/>
+<div th:if="${session.loggedInUser} != null">
+    <div class="container-fluid">
+        <h2>Who Am I?</h2>
+        <form th:action="@{/search-user-profile}" method="post">
+            <div class="form-group">
+                <label for="about">User name:</label>
+                <input type="text" id="username" name="username" autofocus="autofocus" th:value="${searchusername}"/> <input type="submit" class="btn btn-info" value="Search"/>
+            </div>
+
+            <label for="about">About Me:</label>
+            <!--<input type="text" name="aboutme" autofocus="autofocus" th:value="${profiledata}" disabled="true"/> <br />-->
+            <span th:text="${profiledata}">title</span>
+
+        </form>
+    </div>
+</div>
+
+<div th:replace="fragments/footer :: footer"/>
+</body>
+</html>

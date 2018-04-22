@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<div th:replace="fragments/header :: header"/>
+<body>
+<div th:replace="fragments/navigation :: navigation"/>
+<div th:if="${session.loggedInUser} != null">
+<div class="container">
+    <p th:text="${session.message}">Test</p>
+    <a href="/logout" th:href="@{/logout}">Logout</a>
+</div>
+</div>
+<div th:unless="${session.loggedInUser} != null">
+    <p th:text="${session.message}">Test</p>
+    <a href="/login" th:href="@{/login}">Login</a>
+</div>
+
+<div style="margin-left: 500px;">
+
+    <div th:if="${session.s3Mode} != null">
+        <div th:if="${session.loggedInUser} != null">
+            <div th:if="${session.s3Url} == null"><br/>
+                <img th:src="@{~/default.jpeg}" alt="Profile pic" width="200" height="200"/>
+            </div>
+        </div>
+        <div th:if="${session.loggedInUser} != null">
+            <div th:if="${session.s3Url} != null"><br/>
+                <img th:src="@{${session.s3Url}}" alt="Profile pic" width="200" height="200"/>
+            </div>
+        </div>
+    </div>
+    <div th:if="${session.s3Mode} == null">
+        <img th:src="@{/profilepic}" alt="Profile pic" width="200" height="200"/>
+    </div>
+
+    <form method="POST" action="/upload" enctype="multipart/form-data">
+        <input type="file" name="file" /><br/><br/>
+        <input type="submit" value="Submit" />
+    </form>
+    <form method="GET" action="/delete">
+        <input type="submit" value="Delete"/>
+    </form>
+</div>
+
+    <div th:replace="fragments/footer :: footer">Footer</div>
+</body>
+</html>

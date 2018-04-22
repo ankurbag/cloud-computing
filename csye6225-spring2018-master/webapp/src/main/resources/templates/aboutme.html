@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <title>About Me!</title>
+    <div th:replace="fragments/header :: header"/>
+</head>
+<body>
+<div th:replace="fragments/navigation :: navigation"/>
+<div th:if="${session.loggedInUser} != null">
+<div class="container-fluid">
+    <h2>Who Am I?</h2>
+    <form th:action="@{/aboutme}" method="post">
+    <div class="form-group">
+        <label for="about">About Me:</label>
+        <textarea th:text="${session.aboutme}" class="form-control"  rows="5" id="about"  name="aboutme"  maxlength="140">"${session.about}"</textarea>
+    </div>
+
+    <input type="submit" class="btn btn-info" value="Submit Button"/>
+    </form>
+</div>
+    <div th:if="${param.msg}!=null">
+        <div class="alert alert-success">
+            <strong>Success!</strong> Saved Successfully.
+        </div>
+    </div>
+</div>
+
+<div th:unless="${session.loggedInUser} != null">
+    <div class="container-fluid">
+        <h2>Who Am I?</h2>
+
+        <blockquote>
+            <p th:text="${session.about}">Test</p>
+            <footer>From owner's desk! </footer>
+        </blockquote>
+    </div>
+</div>
+
+
+
+    <div th:replace="fragments/footer :: footer"/>
+</body>
+</html>

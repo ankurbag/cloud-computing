@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Register</title>
+    <div th:replace="fragments/header :: header"/>
+</head>
+<body>
+<div th:replace="fragments/navigation :: navigation"/>
+
+<div class="container">
+        <h1>Welcome Guest! Please fill the form to Register</h1>
+        <!--/*@thymesVar id="user" type="java"*/-->
+        <form id="user-form" th:action="@{/register}" th:object="${user}"  method="post">
+            <p class="error-message"
+               th:if="${#fields.hasGlobalErrors()}"
+               th:each="error : ${#fields.errors('global')}"
+               th:text="${error}">Validation error</p>
+            <table border="1">
+                <tr>
+                    <td><label for="firstName">First Name</label></td>
+                    <td><input type="text" id="firstName" name="firstName" th:field="${user.firstName}"  th:class="${#fields.hasErrors('firstName')}? fieldError"  />
+                        <span th:if="${#fields.hasErrors('firstName')}" class="help-block" th:errors="*{firstName}"></span></td>
+                </tr>
+                <tr>
+                    <td><label for="lastName">Last Name</label></td>
+                    <td><input type="text" id="lastName" name="lastName" th:field="${user.lastName}" th:class="${#fields.hasErrors('lastName')}? fieldError" />
+                        <span th:if="${#fields.hasErrors('lastName')}" class="help-block" th:errors="*{lastName}"></span></td>
+                </tr>
+                <tr>
+                    <td><label for="email">Email Id/User Name</label></td>
+                    <td><input type="text" id="email" name="email" th:field="${user.email}" th:classappend="${#fields.hasErrors('email')}? 'has-error':''"/>
+                        <span th:if="${#fields.hasErrors('email')}" class="help-block" th:errors="*{email}"></span></td>
+                </tr>
+                <tr>
+                    <td><label for="password">Password</label></td>
+                    <td><!--/*@thymesVar id="password" type=""*/-->
+                    <input type="password" id="password" name="password" th:field="${user.password}" th:class="${#fields.hasErrors('password')}? fieldError" />
+                    <span th:if="${#fields.hasErrors('password')}" class="help-block" th:errors="*{password}"></span></td>
+                </tr>
+                <tr>
+                    <td><input type="submit" value="Submit" /></td>
+                </tr>
+            </table>
+        </form>
+</div>
+
+<div th:replace="fragments/footer :: footer"/>
+</body>
+</html>

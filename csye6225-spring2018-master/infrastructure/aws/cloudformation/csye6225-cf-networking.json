@@ -1,0 +1,323 @@
+  {
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+      "VPC": {
+        "Type": "AWS::EC2::VPC",
+        "Properties": {
+          "CidrBlock": "10.0.0.0/16",
+          "EnableDnsSupport": "true",
+          "EnableDnsHostnames": "true",
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "VPCNAME"
+              }
+            }
+          ]
+        }
+      },
+      "InternetGateway": {
+        "Type": "AWS::EC2::InternetGateway",
+        "Properties": {
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "IGWNAME"
+              }
+            }
+          ]
+        }
+      },
+      "VPCGatewayAttachment": {
+        "Type": "AWS::EC2::VPCGatewayAttachment",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "InternetGatewayId": {
+            "Ref": "InternetGateway"
+          }
+        }
+      },
+      "RouteTable": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "ROUTETABLENAME"
+              }
+            }
+          ]
+        }
+      },
+      "InternetRoute": {
+        "Type": "AWS::EC2::Route",
+        "DependsOn": "InternetGateway",
+        "Properties": {
+          "DestinationCidrBlock": "0.0.0.0/0",
+          "GatewayId": {
+            "Ref": "InternetGateway"
+          },
+          "RouteTableId": {
+            "Ref": "RouteTable"
+          }
+        }
+      },
+      "RouteTablePrivate": {
+        "Type": "AWS::EC2::RouteTable",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "ROUTETABLENAMEPRIVATE"
+              }
+            }
+          ]
+        }
+      },
+      "MyDBSubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "CidrBlock": "10.0.1.0/24",
+          "MapPublicIpOnLaunch": false,
+          "AvailabilityZone": "us-east-1b",
+          "Tags": [
+            {
+              "Key": "foo",
+              "Value": "bar"
+            }
+          ]
+        }
+      },
+      "MyDBSubnetRouteTableAssociation": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": {
+            "Ref": "MyDBSubnet"
+          },
+          "RouteTableId": {
+            "Ref": "RouteTablePrivate"
+          }
+        }
+      },
+      "MyDBSubnetRouteTableAssociation1": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": {
+            "Ref": "MyDBSubnet2"
+          },
+          "RouteTableId": {
+            "Ref": "RouteTablePrivate"
+          }
+        }
+      },
+      "MyWebSubnet": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "CidrBlock": "10.0.0.0/24",
+          "MapPublicIpOnLaunch": true,
+          "AvailabilityZone": "us-east-1a",
+          "Tags": [
+            {
+              "Key": "foo",
+              "Value": "bar"
+            }
+          ]
+        }
+      },
+      "MyWebSubnet2": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "CidrBlock": "10.0.3.0/24",
+          "MapPublicIpOnLaunch": true,
+          "AvailabilityZone": "us-east-1b",
+          "Tags": [
+            {
+              "Key": "foo",
+              "Value": "bar"
+            }
+          ]
+        }
+      },
+      "MyDBSubnet2": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "CidrBlock": "10.0.2.0/24",
+          "MapPublicIpOnLaunch": false,
+          "AvailabilityZone": "us-east-1c",
+          "Tags": [
+            {
+              "Key": "foo1",
+              "Value": "bar1"
+            }
+          ]
+        }
+      },
+      "MyWebSubnetRouteTableAssociation": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": {
+            "Ref": "MyWebSubnet"
+          },
+          "RouteTableId": {
+            "Ref": "RouteTable"
+          }
+        }
+      },
+      "MyWebSubnetRouteTableAssociation2": {
+        "Type": "AWS::EC2::SubnetRouteTableAssociation",
+        "Properties": {
+          "SubnetId": {
+            "Ref": "MyWebSubnet2"
+          },
+          "RouteTableId": {
+            "Ref": "RouteTable"
+          }
+        }
+      },
+      "WebInstanceSecurityGroup": {
+        "Type": "AWS::EC2::SecurityGroup",
+        "Properties": {
+          "GroupDescription": "Allow http to access host",
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "SecurityGroupIngress": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "80",
+              "ToPort": "80",
+              "CidrIp": "0.0.0.0/0"
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "22",
+              "ToPort": "22",
+              "CidrIp": "0.0.0.0/0"
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "443",
+              "ToPort": "443",
+              "CidrIp": "0.0.0.0/0"
+            },
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "8080",
+              "ToPort": "8080",
+              "CidrIp": "0.0.0.0/0"
+            }
+          ],
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "WebSecurityGrp"
+              }
+            }
+          ]
+        }
+      },
+      "MyDBEC2SecurityGroup": {
+        "Type": "AWS::EC2::SecurityGroup",
+        "Properties": {
+          "GroupDescription": "Open database for particular access",
+          "VpcId": {
+            "Ref": "VPC"
+          },
+          "SecurityGroupIngress": [
+            {
+              "IpProtocol": "tcp",
+              "FromPort": "3306",
+              "ToPort": "3306",
+              "SourceSecurityGroupId": {
+                "Fn::GetAtt": [
+                  "WebInstanceSecurityGroup",
+                  "GroupId"
+                ]
+              }
+            }
+          ],
+          "Tags": [
+            {
+              "Key": "Name",
+              "Value": {
+                "Ref": "DBSecurityGrp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "Outputs": {
+      "Websubnet1ID": {
+          "Description": "Public Web subnet Id",
+          "Value": { "Ref" : "MyWebSubnet"},
+          "Export":{ "Name" : "WebSubnet1IDExportValue"}
+      },
+    "Dbsubnet1ID": {
+      "Description": "Private DB subnet Id",
+      "Value": { "Ref" : "MyDBSubnet"},
+      "Export":{ "Name" : "DBSubnet1IDExportValue"}
+  },
+      "Websubnet2ID": {
+        "Description": "Public Web subnet Id 2",
+        "Value": { "Ref" : "MyWebSubnet2"},
+        "Export":{ "Name" : "WebSubnet2IDExportValue"}
+    },
+  "Dbsubnet2ID": {
+    "Description": "Private DB subnet Id 2",
+    "Value": { "Ref" : "MyDBSubnet2"},
+    "Export":{ "Name" : "DBSubnet2IDExportValue"}
+  }
+  },
+    "Parameters": {
+      "VPCNAME": {
+        "Description": "The stack name",
+        "Type": "String"
+      },
+      "IGWNAME": {
+        "Description": "The stack name",
+        "Type": "String"
+      },
+      "ROUTETABLENAME": {
+        "Description": "The stack name",
+        "Type": "String"
+      },
+      "ROUTETABLENAMEPRIVATE": {
+        "Description": "The private route table name",
+        "Type": "String"
+      },
+      "DBSecurityGrp": {
+        "Description": "The web server subnet name",
+        "Type": "String"
+      },
+      "WebSecurityGrp": {
+        "Description": "The db server subnet table name",
+        "Type": "String"
+      }
+    }
+  }
